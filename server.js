@@ -101,7 +101,7 @@ db.prepare(`
         user_agent TEXT,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )
-`);
+`).run();
 db.prepare(`
     CREATE TABLE IF NOT EXISTS high_scores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
