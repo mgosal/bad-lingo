@@ -2,6 +2,8 @@ services:
   bad-lingo:
     build: .
     restart: always
+    env_file:
+      - .env
     networks:
       - root_default
     labels:

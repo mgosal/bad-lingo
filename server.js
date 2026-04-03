@@ -3,6 +3,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const morgan = require('morgan');
 const fs = require('fs');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -53,35 +54,52 @@ function bootstrapWords() {
     console.log("Checking words database...");
     wordsDb.prepare(`CREATE TABLE IF NOT EXISTS classic_words (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT, length INTEGER, is_urban BOOLEAN)`).run();
     wordsDb.prepare(`CREATE TABLE IF NOT EXISTS cockney_slang (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT, hint TEXT, answer TEXT, explanation TEXT)`).run();
+    wordsDb.prepare(`CREATE TABLE IF NOT EXISTS seed_meta (key TEXT PRIMARY KEY, value TEXT)`).run();
 
-    // Check if we already have data
+    // Compute a hash of the current seed data to detect changes
+    const seedHash = crypto.createHash('md5').update(SEED_CORE + SEED_URBAN + SEED_RHYME).digest('hex');
+    const storedHash = wordsDb.prepare('SELECT value FROM seed_meta WHERE key = ?').get('seed_hash');
+
     const classicCount = wordsDb.prepare('SELECT COUNT(*) as count FROM classic_words').get().count;
     const cockneyCount = wordsDb.prepare('SELECT COUNT(*) as count FROM cockney_slang').get().count;
 
-    if (classicCount > 0 && cockneyCount > 0) {
-        console.log(`Database already contains ${classicCount} classic words and ${cockneyCount} cockney phrases. Skipping seed.`);
+    // Re-seed if: empty database OR seed data has changed (e.g. SFW fallback → real words)
+    const needsReseed = classicCount === 0 || cockneyCount === 0 || !storedHash || storedHash.value !== seedHash;
+
+    if (!needsReseed) {
+        console.log(`Database up-to-date (${classicCount} classic words, ${cockneyCount} cockney phrases). Hash: ${seedHash.substring(0, 8)}...`);
         return;
     }
+
+    console.log(`Seed data changed or empty — re-seeding database... (old hash: ${storedHash?.value?.substring(0, 8) || 'none'}, new hash: ${seedHash.substring(0, 8)})`);
 
     const SEED_DATA = JSON.parse(Buffer.from(SEED_CORE, 'base64').toString('utf-8'));
     const URBAN_WORDS = JSON.parse(Buffer.from(SEED_URBAN, 'base64').toString('utf-8'));
     const RHYME_DATA = JSON.parse(Buffer.from(SEED_RHYME, 'base64').toString('utf-8'));
 
-    if (classicCount === 0) {
-        console.log("Seeding Classic Words library...");
-        const insertClassic = wordsDb.prepare('INSERT INTO classic_words (word, length, is_urban) VALUES (?, ?, ?)');
-        for (const [len, words] of Object.entries(SEED_DATA)) {
-            words.forEach(word => {
-                insertClassic.run(word, parseInt(len), URBAN_WORDS.includes(word) ? 1 : 0);
-            });
-        }
+    // Wipe and re-seed classic words
+    wordsDb.prepare('DELETE FROM classic_words').run();
+    console.log("Seeding Classic Words library...");
+    const insertClassic = wordsDb.prepare('INSERT INTO classic_words (word, length, is_urban) VALUES (?, ?, ?)');
+    let classicTotal = 0;
+    for (const [len, words] of Object.entries(SEED_DATA)) {
+        words.forEach(word => {
+            insertClassic.run(word, parseInt(len), URBAN_WORDS.includes(word) ? 1 : 0);
+            classicTotal++;
+        });
     }
+    console.log(`  → Seeded ${classicTotal} classic words`);
 
-    if (cockneyCount === 0) {
-        console.log("Seeding Cockney library...");
-        const insertCockney = wordsDb.prepare('INSERT INTO cockney_slang (phrase, hint, answer, explanation) VALUES (?, ?, ?, ?)');
-        RHYME_DATA.forEach(c => insertCockney.run(c.phrase, c.hint, c.phrase, c.meaning || 'Cockney Slang'));
-    }
+    // Wipe and re-seed cockney
+    wordsDb.prepare('DELETE FROM cockney_slang').run();
+    console.log("Seeding Cockney library...");
+    const insertCockney = wordsDb.prepare('INSERT INTO cockney_slang (phrase, hint, answer, explanation) VALUES (?, ?, ?, ?)');
+    RHYME_DATA.forEach(c => insertCockney.run(c.phrase, c.hint, c.phrase, c.meaning || 'Cockney Slang'));
+    console.log(`  → Seeded ${RHYME_DATA.length} cockney phrases`);
+
+    // Store the hash so we don't re-seed unnecessarily on next start
+    wordsDb.prepare('INSERT OR REPLACE INTO seed_meta (key, value) VALUES (?, ?)').run('seed_hash', seedHash);
+    console.log("Seed complete. Hash stored.");
 }
 
 
