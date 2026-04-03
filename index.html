@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+    <title>Bad Lingo | The Ultimate Word Challenge</title>
+    <meta name="description" content="A premium word-guessing game with evolving difficulty levels. Guess the word, avoid the slurs, and beat the clock.">
+    <link rel="stylesheet" href="index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Menu View -->
+        <div id="menu-view" class="view">
+            <header>
+                <h1 id="logo">BAD<span>LINGO</span></h1>
+                <p class="subtitle">Pick your poison</p>
+            </header>
+            <div class="menu-grid">
+                <button class="menu-btn glass" id="btn-classic">
+                    <div class="btn-icon">💀</div>
+                    <div class="btn-text">
+                        <span class="btn-title">CLASSIC LINGO</span>
+                        <span class="btn-desc">Pure vulgarity. 4-10 letters.</span>
+                    </div>
+                </button>
+                <button class="menu-btn glass" id="btn-cockney">
+                    <div class="btn-icon">🇬🇧</div>
+                    <div class="btn-text">
+                        <span class="btn-title">COCKNEY SLANG</span>
+                        <span class="btn-desc">Apples & Pears. Multi-word rhymes.</span>
+                    </div>
+                </button>
+            </div>
+            <footer class="menu-footer">
+                <p>Designed for the culture.</p>
+            </footer>
+        </div>
+
+        <!-- Game View -->
+        <div id="game-view" class="view hidden">
+            <header>
+                <div class="header-top">
+                    <button id="back-to-menu-btn" class="glass-btn small">MENU</button>
+                    <h1 id="logo">BAD<span>LINGO</span></h1>
+                    <div style="width: 60px"></div> <!-- Spacer -->
+                </div>
+                <div id="status-bar">
+                    <div class="stat-item">ROUND: <span id="round-num">1</span></div>
+                    <div class="stat-item">LETTERS: <span id="letter-count">4</span></div>
+                </div>
+                <div id="urban-hint" class="hint-badge hidden">SOURCE: URBAN DICTIONARY</div>
+                <div id="adult-hint" class="adult-badge hidden">🔞 ADULT CONTENT</div>
+                <div id="cockney-hint-container" class="hidden">
+                    <div class="hint-btns">
+                        <button id="show-hint-btn" class="glass-btn xsmall">SHOW HINT</button>
+                        <button id="show-rhyme-btn" class="glass-btn xsmall hidden">SHOW RHYME</button>
+                    </div>
+                    <div id="hint-text" class="hidden">HINT: <span id="hint-clue">?</span></div>
+                    <div id="rhyme-text" class="hidden">RHYMES WITH: <span id="rhyme-target">?</span></div>
+                </div>
+            </header>
+
+            <main id="board-container">
+                <div id="board" class="grid-4">
+                    <!-- Rows will be injected here via JS -->
+                </div>
+            </main>
+
+            <section id="keyboard-container">
+                <div id="keyboard">
+                    <!-- Buttons will be injected here via JS -->
+                </div>
+            </section>
+        </div>
+
+        <div id="modal-overlay" class="hidden">
+            <div id="modal-content" class="glass">
+                <h2 id="modal-title">GOAL!</h2>
+                <p id="modal-message">You nailed it.</p>
+                <div id="modal-word-reveal"></div>
+                <button id="next-round-btn">NEXT ROUND</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Celebration Canvas -->
+    <canvas id="confetti"></canvas>
+
+    <script src="app.js"></script>
+</body>
+</html>

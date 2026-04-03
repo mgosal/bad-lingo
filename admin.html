@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bad Lingo | Admin Dashboard</title>
+    <link rel="stylesheet" href="index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { align-items: flex-start; padding: 2rem; overflow-y: auto; }
+        .admin-container { max-width: 1200px; margin: 0 auto; width: 100%; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card-bg); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-color); backdrop-filter: blur(var(--glass-blur)); text-align: center; }
+        .stat-val { font-size: 2rem; font-weight: 700; color: var(--primary-color); }
+        .stat-lab { font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; margin-top: 0.5rem; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; margin-top: 1rem; }
+        th { text-align: left; padding: 1rem; opacity: 0.6; font-weight: 500; font-size: 0.8rem; text-transform: uppercase; }
+        td { padding: 1rem; background: var(--card-bg); backdrop-filter: blur(var(--glass-blur)); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+        td:first-child { border-left: 1px solid var(--border-color); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+        td:last-child { border-right: 1px solid var(--border-color); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+        .tag { padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+        .tag-win { background: var(--correct-color); color: white; }
+        .tag-loss { background: var(--error-color); color: white; }
+        .tag-guess { background: rgba(255,255,255,0.1); }
+        .tag-classic { border: 1px solid var(--primary-color); color: var(--primary-color); }
+        .tag-cockney { border: 1px solid #FFBD33; color: #FFBD33; }
+        
+        /* Tooltip Styles */
+        .tooltip {
+            position: fixed;
+            background: rgba(15, 15, 20, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 12px;
+            color: white;
+            font-size: 0.85rem;
+            max-width: 300px;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: opacity 0.2s;
+            opacity: 0;
+        }
+        .tooltip.visible { opacity: 1; }
+        .tooltip strong { color: var(--primary-color); display: block; margin-bottom: 0.3rem; }
+        .tooltip .rhyme { color: #FFBD33; font-weight: 700; margin-top: 0.5rem; display: block; }
+        .target-word { cursor: help; text-decoration: underline dotted rgba(255,255,255,0.3); }
+    </style>
+</head>
+<body>
+    <div id="admin-tooltip" class="tooltip"></div>
+    <div class="admin-container">
+        <header>
+            <h1 id="logo">BAD<span>LOGS</span></h1>
+            <p style="opacity:0.6; margin-top:0.5rem">Real-time Game Activity Monitor</p>
+        </header>
+
+        <div class="stats-grid" id="stats">
+            <div class="stat-card"><div class="stat-val" id="total-games">-</div><div class="stat-lab">Total Sessions</div></div>
+            <div class="stat-card"><div class="stat-val" id="win-rate">-</div><div class="stat-lab">Win Rate</div></div>
+            <div class="stat-card"><div class="stat-val" id="avg-round">-</div><div class="stat-lab">Avg Round</div></div>
+        </div>
+
+        <div id="log-table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Mode</th>
+                        <th>Event</th>
+                        <th>Word</th>
+                        <th>Guess</th>
+                        <th>Result</th>
+                        <th>Platform</th>
+                    </tr>
+                </thead>
+                <tbody id="log-body">
+                    <tr><td colspan="6" style="text-align:center">Loading logs...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="words.js"></script>
+    <script src="cockney_words.js"></script>
+    <script>
+        let adminSecret = '';
+
+        async function fetchLogs() {
+            if (!adminSecret) {
+                adminSecret = prompt("Enter Admin Password:");
+                if (!adminSecret) return;
+            }
+
+            try {
+                const res = await fetch(`/api/admin/logs?secret=${adminSecret}`);
+                if (res.status === 403) {
+                    alert("Unauthorized!");
+                    adminSecret = '';
+                    return;
+                }
+                const logs = await res.json();
+                renderLogs(logs);
+            } catch (err) {
+                console.error("Failed to fetch logs", err);
+            }
+        }
+
+        function renderLogs(logs) {
+            const body = document.getElementById('log-body');
+            body.innerHTML = '';
+            
+            let wins = 0;
+            let totalGames = 0;
+            let totalRounds = 0;
+            const seenSessions = new Set();
+
+            logs.forEach(log => {
+                const tr = document.createElement('tr');
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const plateNode = log.user_agent.includes('iPhone') ? '📱 iPhone' : '💻 Desktop';
+                
+                if (log.event === 'WIN') wins++;
+                if (log.event === 'WIN' || log.event === 'LOSS') totalGames++;
+                if (!seenSessions.has(log.session_id)) {
+                    seenSessions.add(log.session_id);
+                }
+
+                // Tooltip Info: Fetch from API
+-                tr.innerHTML = `
+-                    <td style="opacity:0.7">${time}</td>
+-                    <td><span class="tag ${log.mode === 'cockney' ? 'tag-cockney' : 'tag-classic'}">${(log.mode || 'classic').toUpperCase()}</span></td>
+-                    <td><span class="tag ${log.event === 'WIN' ? 'tag-win' : log.event === 'LOSS' ? 'tag-loss' : 'tag-guess'}">${log.event}</span></td>
+-                    <td><span class="target-word" data-word="${log.target_word}">${log.target_word || '-'}</span></td>
+-                    <td style="letter-spacing:1px">${log.guess || '-'}</td>
+-                    <td>${log.result || '-'}</td>
+-                    <td style="font-size:0.8rem; opacity:0.6">${plateNode}</td>
+-                `;
+-                body.appendChild(tr);
+-            });
+
+            // Tooltip Logic
+            const tipEl = document.getElementById('admin-tooltip');
+            document.querySelectorAll('.target-word').forEach(el => {
+                el.addEventListener('mouseenter', async (e) => {
+                    const word = e.target.getAttribute('data-word');
+                    if (!word || word === '-') return;
+
+                    try {
+                        const res = await fetch(`/api/admin/word-info?word=${word}&secret=${adminSecret}`);
+                        const data = await res.json();
+
+                        let content = '';
+                        if (data.mode === 'cockney') {
+                            content = `<strong>COCKNEY SLANG</strong>${data.hint}<span class="rhyme">Rhymes with: ${data.answer}</span>`;
+                        } else {
+                            content = data.isUrban ? "<strong>URBAN SLANG</strong>Highly popular street terminology." : "<strong>BAD LINGO</strong>Standard vulgar/offensive term.";
+                        }
+                        
+                        tipEl.innerHTML = content;
+                        tipEl.classList.add('visible');
+                    } catch (err) {
+                        console.error('Tooltip fetch failed', err);
+                    }
+                });
+                el.addEventListener('mousemove', (e) => {
+                    tipEl.style.left = (e.clientX + 15) + 'px';
+                    tipEl.style.top = (e.clientY + 15) + 'px';
+                });
+                el.addEventListener('mouseleave', () => {
+                    tipEl.classList.remove('visible');
+                });
+            });
+
+            // Update Stats
+            document.getElementById('total-games').innerText = seenSessions.size;
+            document.getElementById('win-rate').innerText = totalGames > 0 ? Math.round((wins / totalGames) * 100) + '%' : '-';
+            document.getElementById('avg-round').innerText = logs.length > 0 ? (logs.reduce((acc, l) => acc + (l.round || 0), 0) / logs.length).toFixed(1) : '-';
+        }
+
+        fetchLogs();
+        setInterval(fetchLogs, 5000); // Poll every 5s
+    </script>
+</body>
+</html>

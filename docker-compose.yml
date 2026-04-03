@@ -1,0 +1,23 @@
+services:
+  bad-lingo:
+    build: .
+    restart: always
+    networks:
+      - root_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.badlingo.rule=Host(`bad-lingo.aiguy.cloud`)"
+      - "traefik.http.routers.badlingo.entrypoints=websecure"
+      - "traefik.http.routers.badlingo.tls=true"
+      - "traefik.http.routers.badlingo.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.badlingo.loadbalancer.server.port=3000"
+      - "traefik.docker.network=root_default"
+    volumes:
+      - bad-lingo-data:/data
+
+networks:
+  root_default:
+    external: true
+
+volumes:
+  bad-lingo-data:
